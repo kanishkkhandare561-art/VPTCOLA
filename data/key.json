@@ -1,0 +1,9 @@
+{
+ "v": 1,
+ "kdf": "PBKDF2-SHA256",
+ "iter": 310000,
+ "salt": "lCBev5PS8JvNCv9Lg8PRRA==",
+ "iv": "nQvmKYBBnMow6/Qy",
+ "wrapped": "hjIkNgxpqc+iPQ5aG2QF9pkbVJDIdaDUVh8IG9WSKl4RzKDr7euUhn0RhM/W64io",
+ "aad": "cln-key-v1"
+}

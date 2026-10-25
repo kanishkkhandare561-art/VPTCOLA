@@ -1,0 +1,1 @@
+try{var t=localStorage.getItem('cln.theme');if(t&&t!=='auto')document.documentElement.dataset.theme=t;var s=localStorage.getItem('cln.size');if(s)document.documentElement.style.setProperty('--read',s+'rem')}catch(e){}
