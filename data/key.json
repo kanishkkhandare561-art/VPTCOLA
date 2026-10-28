@@ -1,9 +1,0 @@
-{
- "v": 1,
- "kdf": "PBKDF2-SHA256",
- "iter": 310000,
- "salt": "VzTxSxEkEZVh/m1Ib/cPfw==",
- "iv": "7jdKeu89zos7DcVo",
- "wrapped": "w3nPluWeTE8Iv5Y79uNwyl2Vw/d3x0zLa09yGW6pMdOi3u5SEvVYdUbAYMnCcsVM",
- "aad": "cln-key-v1"
-}

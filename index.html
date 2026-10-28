@@ -5,26 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src blob:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self' blob:; object-src 'self' blob:; base-uri 'none'; form-action 'none'">
 <title>Constitutional Law Notes</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%231F3C88' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%231F3C88'/%3E%3Cg stroke='%231F3C88' stroke-width='1.4'%3E%3Cpath d='M16 3v26M3 16h26M6.8 6.8l18.4 18.4M25.2 6.8 6.8 25.2'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="stylesheet" href="assets/app.css">
 <script src="assets/boot.js"></script>
 </head>
 <body>
-<noscript><p style="padding:24px">This site needs JavaScript to unlock and read the notes.</p></noscript>
+<noscript><p style="padding:24px">This site needs JavaScript to show the notes.</p></noscript>
 
-<section id="lock" aria-labelledby="lock-h">
-  <form class="lock-card" id="lock-form" autocomplete="off">
-    <h1 id="lock-h">Constitutional Law</h1>
-    <p class="sub">Private study notes. Enter the password to open them.</p>
-    <p class="lock-quote">No person shall be deprived of his life or personal liberty except according to procedure established by law.<br><span style="font-style:normal">— Article 21</span></p>
-    <label class="field"><span>Password</span>
-      <input class="input" id="pw" type="password" autocomplete="current-password" required autofocus></label>
-    <label class="check"><input type="checkbox" id="remember"> Keep me signed in on this device</label>
-    <button class="btn" id="unlock" type="submit">Open notes</button>
-    <p class="err" id="lock-err" role="alert"></p>
-  </form>
+<section id="lock" aria-live="polite">
+  <p class="sub">Loading the notes…</p>
 </section>
 
 <div id="app" hidden>

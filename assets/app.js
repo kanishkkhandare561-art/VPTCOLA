@@ -1,14 +1,10 @@
-/* Constitutional Law notes — private, encrypted study site.
-   The notes live in data/c.bin (AES-256-GCM). The key is wrapped with a key derived from the password
-   (PBKDF2-SHA256) in data/key.json. Everything is decrypted in the browser; nothing is sent anywhere. */
+/* Constitutional Law notes — study site.
+   The notes live in data/notes.json; the lecture files are in data/files/. No password is needed. */
 'use strict';
 (() => {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-  const b64e = u8 => { let s = ''; u8.forEach(b => { s += String.fromCharCode(b); }); return btoa(s); };
-  const enc = new TextEncoder();
   const today = () => Math.floor(Date.now() / 864e5);
 
   /* ---------------- local storage (per device, never leaves the browser) ---------------- */
@@ -22,74 +18,16 @@
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } },
   };
 
-  /* ---------------- crypto ---------------- */
-  let KEY = null;
+  /* ---------------- data ---------------- */
   let DB = null;
   const IK = 'https://indiankanoon.org';
 
-  async function fetchBytes(path) {
-    const r = await fetch(path, { cache: 'no-cache' });
-    if (!r.ok) throw new Error(`Could not load ${path} (${r.status})`);
-    return new Uint8Array(await r.arrayBuffer());
-  }
-  async function unseal(buf) {
-    return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, KEY, buf.slice(12)));
-  }
-  async function gunzip(u8) {
-    const s = new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'));
-    return new Uint8Array(await new Response(s).arrayBuffer());
-  }
-  async function keyFile() {
-    const r = await fetch('data/key.json', { cache: 'no-cache' });
-    if (!r.ok) throw new Error('The key file is missing (data/key.json).');
-    return r.json();
-  }
-  async function kekFrom(pw, kf, usage) {
-    const base = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveKey']);
-    return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64d(kf.salt), iterations: kf.iter, hash: 'SHA-256' },
-      base, { name: 'AES-GCM', length: 256 }, false, usage);
-  }
-  async function unwrapWith(pw, kf) {
-    const kek = await kekFrom(pw, kf, ['decrypt']);
-    try {
-      return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64d(kf.iv), additionalData: enc.encode(kf.aad) }, kek, b64d(kf.wrapped)));
-    } catch (e) { return null; }
-  }
-  async function useKey(rawKey) { KEY = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']); }
-
   async function loadDB() {
-    const plain = await gunzip(await unseal(await fetchBytes('data/c.bin')));
-    DB = JSON.parse(new TextDecoder().decode(plain));
+    const r = await fetch('data/notes.json', { cache: 'no-cache' });
+    if (!r.ok) throw new Error(`Could not load the notes (${r.status})`);
+    DB = await r.json();
     indexDB();
   }
-
-  /* ---------------- lock screen ---------------- */
-  async function tryRemembered() {
-    const k = raw.get('cln.k') || (() => { try { return sessionStorage.getItem('cln.k'); } catch (e) { return null; } })();
-    if (!k) return false;
-    try { await useKey(b64d(k)); await loadDB(); return true; } catch (e) { forget(); return false; }
-  }
-  function forget() { try { localStorage.removeItem('cln.k'); sessionStorage.removeItem('cln.k'); } catch (e) { /* ignore */ } KEY = null; }
-
-  $('#lock-form').addEventListener('submit', async ev => {
-    ev.preventDefault();
-    const btn = $('#unlock'), err = $('#lock-err'), pw = $('#pw').value;
-    if (!window.crypto?.subtle || !window.DecompressionStream) { err.textContent = 'This browser is too old to open the notes. Use a current Chrome, Edge, Firefox or Safari.'; return; }
-    btn.disabled = true; btn.textContent = 'Opening…'; err.textContent = '';
-    try {
-      const kf = await keyFile();
-      const rk = await unwrapWith(pw, kf);
-      if (!rk) { err.textContent = 'That password is not right. Check it and try again.'; return; }
-      await useKey(rk);
-      await loadDB();
-      const b = b64e(rk);
-      if ($('#remember').checked) raw.set('cln.k', b); else { try { sessionStorage.setItem('cln.k', b); } catch (e) { /* ignore */ } }
-      $('#pw').value = '';
-      start();
-    } catch (e) {
-      err.textContent = e.message || 'The notes could not be opened.';
-    } finally { btn.disabled = false; btn.textContent = 'Open notes'; }
-  });
 
   /* ---------------- data indexes ---------------- */
   const M = { ch: {}, sec: {}, secs: [], cases: {}, qa: {}, art: {}, fix: {}, src: {}, fixWhere: {}, topics: [] };
@@ -731,25 +669,20 @@
   }
 
   /* ---------------- lecture files ---------------- */
-  const blobs = {};
-  async function sourceBlob(src) {
-    if (blobs[src.id]) return blobs[src.id];
-    const bytes = await unseal(await fetchBytes(`data/s/${src.id}.bin`));
-    const type = src.kind === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    blobs[src.id] = URL.createObjectURL(new Blob([bytes], { type }));
-    return blobs[src.id];
+  function sourceBlob(src) {
+    return Promise.resolve(`data/files/${src.id}.${src.kind === 'pdf' ? 'pdf' : 'docx'}`);
   }
   function sourcesView(id, q) {
     if (id) return sourceView(id, q);
     const groups = []; DB.sources.forEach(s => { if (!groups.includes(s.group)) groups.push(s.group); });
-    view().innerHTML = `<div class="wrap"><h1 class="page">Lecture files</h1><p class="lede">The original files, decrypted only in your browser. Every PDF page is also in the site search.</p>
+    view().innerHTML = `<div class="wrap"><h1 class="page">Lecture files</h1><p class="lede">The original lecture files. Every PDF page is also in the site search.</p>
       ${groups.map(g => `<h2 class="block">${esc(g)}</h2><ul class="src-list">${DB.sources.filter(s => s.group === g).map(s => `<li><div><a class="t" href="#/source/${s.id}">${esc(s.title)}</a><br><small>${esc(s.date)}; ${esc(s.topics)}; ${s.kind === 'pdf' ? `${s.pages} pages` : 'Word file'}, ${(s.size / 1e6).toFixed(1)} MB</small></div><a class="btn small ghost" href="#/source/${s.id}">${s.kind === 'pdf' ? 'Open' : 'Download'}</a></li>`).join('')}</ul>`).join('')}</div>`;
   }
   function sourceView(id, q) {
     const s = M.src[id]; if (!s) return notFound();
     const page = +q.get('p') || 1;
     view().innerHTML = `<div class="wrap"><p class="muted"><a href="#/sources">Lecture files</a></p><h1 class="page">${esc(s.title)}</h1><p class="lede">${esc(s.date)} — ${esc(s.topics)}</p>
-      <div class="row" id="sa"><span class="muted">Decrypting…</span></div>
+      <div class="row" id="sa"><span class="muted">Loading…</span></div>
       ${s.kind === 'pdf' ? `<form class="toolbar" id="ps" style="margin-top:16px"><label class="sr" for="pq">Search this file</label><input class="input" id="pq" type="search" placeholder="Search inside this file"><button class="btn small ghost">Find pages</button></form><div id="pr"></div><div class="viewer" id="vw"></div>` : '<p class="muted" style="margin-top:14px">Word files cannot be shown in the browser; download it to open in Word or Google Docs.</p>'}</div>`;
     sourceBlob(s).then(url => {
       $('#sa').innerHTML = `<a class="btn" href="${url}${s.kind === 'pdf' ? `#page=${page}` : ''}" target="_blank" rel="noopener">${s.kind === 'pdf' ? 'Open in a new tab' : 'Open'}</a><a class="btn ghost" href="${url}" download="${esc(s.file)}">Download</a>`;
@@ -805,15 +738,6 @@
     view().innerHTML = `<div class="wrap narrow"><h1 class="page">Settings</h1>
       <h2 class="block">Appearance</h2><div class="chips" id="th">${[['auto', 'Match device'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => `<button class="chip" data-t="${k}" aria-pressed="${k === theme}">${l}</button>`).join('')}</div>
       <label class="field" style="margin-top:18px;max-width:360px"><span>Reading text size</span><input type="range" id="fs" min="1" max="1.4" step="0.025" value="${size}" style="width:100%"></label>
-      <h2 class="block">Privacy</h2>
-      <p>The notes are encrypted with AES-256. The password never leaves this browser; without it the site shows only the lock screen.</p>
-      <div class="row"><button class="btn ghost" id="lockn">Lock now</button><button class="btn ghost" id="forget">Lock and forget this device</button></div>
-      <h2 class="block">Change the password</h2>
-      <p class="muted">This makes a new key file. Upload it to GitHub at <b>docs/data/key.json</b> (replacing the old one); the new password works once GitHub Pages updates, usually within a minute.</p>
-      <form id="cpw" style="max-width:420px"><label class="field"><span>Current password</span><input class="input" type="password" name="o" required autocomplete="current-password"></label>
-        <label class="field"><span>New password (at least 10 characters)</span><input class="input" type="password" name="n" minlength="10" required autocomplete="new-password"></label>
-        <label class="field"><span>Repeat the new password</span><input class="input" type="password" name="r" minlength="10" required autocomplete="new-password"></label>
-        <button class="btn">Make the new key file</button><p class="err" id="cerr"></p></form>
       <h2 class="block">About</h2>
       <p class="muted">Built ${esc(DB.built)} from your Word notes, the day-wise PDF and ${DB.sources.length} lecture files. Case dates and links were checked on Indian Kanoon; ${DB.corrections.length} corrections are listed on the <a href="#/fixes">corrections page</a>. Constitution text: civictech-India/constitution-of-india dataset, with amendments checked. Fonts: Literata and Mukta (SIL Open Font License). Search: MiniSearch (MIT).</p></div>`;
     $('#th').addEventListener('click', e => {
@@ -822,27 +746,11 @@
       $$('#th .chip').forEach(x => x.setAttribute('aria-pressed', x === b));
     });
     $('#fs').addEventListener('input', e => { raw.set('cln.size', e.target.value); document.documentElement.style.setProperty('--read', e.target.value + 'rem'); });
-    $('#lockn').addEventListener('click', () => { try { sessionStorage.removeItem('cln.k'); } catch (e) { /* ignore */ } location.reload(); });
-    $('#forget').addEventListener('click', () => { forget(); location.hash = ''; location.reload(); });
-    $('#cpw').addEventListener('submit', async e => {
-      e.preventDefault(); const f = e.target, err = $('#cerr'); err.textContent = '';
-      if (f.n.value !== f.r.value) { err.textContent = 'The new passwords do not match.'; return; }
-      try {
-        const kf = await keyFile(); const rk = await unwrapWith(f.o.value, kf);
-        if (!rk) { err.textContent = 'The current password is not right.'; return; }
-        const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
-        const nk = { ...kf, salt: b64e(salt), iv: b64e(iv) };
-        const kek = await kekFrom(f.n.value, nk, ['encrypt']);
-        nk.wrapped = b64e(new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode(kf.aad) }, kek, rk)));
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(nk, null, 1)], { type: 'application/json' }));
-        a.download = 'key.json'; a.click(); f.reset(); toast('key.json downloaded — upload it to docs/data/ on GitHub');
-      } catch (ex) { err.textContent = ex.message; }
-    });
   }
 
   /* ---------------- boot ---------------- */
   (async () => {
-    if (await tryRemembered()) start();
-    else { $('#lock').hidden = false; $('#pw').focus(); }
+    try { await loadDB(); start(); }
+    catch (e) { $('#lock').innerHTML = `<p class="err" style="padding:24px">${esc(e.message || 'The notes could not be loaded.')}</p>`; }
   })();
 })();
