@@ -30,8 +30,8 @@
   }
 
   /* ---------------- data indexes ---------------- */
-  const DOCS = ['exam', 'day', 'ddbu'];
-  const DOC_NAME = { exam: 'Exam-ready notes', day: 'Day-wise notes', ddbu: 'D.D.B.U notes' };
+  const DOCS = ['exam', 'day', 'ddbu', 'guide'];
+  const DOC_NAME = { exam: 'Exam-ready notes', day: 'Day-wise notes', ddbu: 'D.D.B.U notes', guide: 'Basu article guide' };
   const M = { ch: {}, sec: {}, secs: [], cases: {}, qa: {}, art: {}, fix: {}, src: {}, fixWhere: {}, topics: [] };
   function indexDB() {
     for (const doc of DOCS) {
@@ -55,7 +55,7 @@
     const t = new Set(); DB.cases.forEach(c => c.topics.forEach(x => t.add(x)));
     M.topics = [...t].sort();
   }
-  const chapterLabel = ch => ch.doc === 'ddbu' ? (ch.kind === 'front' ? 'Start here' : `Chapter ${ch.num}`) : ch.doc === 'exam'
+  const chapterLabel = ch => ch.doc === 'guide' ? (ch.kind === 'front' ? 'Start here' : (/^\d/.test(ch.num) ? `Art ${ch.num}` : ch.num === 'Pre' ? 'Preamble' : ch.num === 'Intro' ? 'Introduction' : 'Part III')) : ch.doc === 'ddbu' ? (ch.kind === 'front' ? 'Start here' : `Chapter ${ch.num}`) : ch.doc === 'exam'
     ? (ch.num ? `Lecture ${ch.num}` : (ch.kind === 'toolkit' ? 'Revision' : 'Start here'))
     : (ch.id === 'D0' ? 'Reference' : ch.id === 'WS' ? 'Handout' : ch.id === 'Dintro' ? 'Start here' : `Day ${ch.num}`);
   const secHref = (key, extra = '') => `#/read/${key}${extra}`;
@@ -71,7 +71,7 @@
 
   /* ---------------- shell ---------------- */
   const NAV = [
-    ['Read', [['#/', 'Home'], ['#/read/exam/L1', 'Exam-ready notes', () => 'Oct'], ['#/read/day/D1', 'Day-wise class notes', () => 'Jul–Oct'], ['#/read/ddbu/B0', 'D.D.B.U — Basu on Art 13', () => DB.ddbu.length - 1], ['#/fixes', 'Corrections', () => DB.corrections.length]]],
+    ['Read', [['#/', 'Home'], ['#/read/exam/L1', 'Exam-ready notes', () => 'Oct'], ['#/read/day/D1', 'Day-wise class notes', () => 'Jul–Oct'], ['#/read/ddbu/B0', 'D.D.B.U — Basu on Art 13', () => DB.ddbu.length - 1], ['#/read/guide/G0', 'Basu article guide', () => DB.guide.length - 1], ['#/fixes', 'Corrections', () => DB.corrections.length]]],
     ['Find', [['#/search', 'Search everything'], ['#/cases', 'Case finder', () => DB.cases.length], ['#/articles', 'Constitution text', () => DB.articles.length], ['#/kanoon', 'Indian Kanoon search']]],
     ['Practise', [['#/solve', 'Problem frameworks'], ['#/flash', 'Flashcards'], ['#/quiz', 'Case quiz'], ['#/timeline', 'Timeline']]],
     ['Yours', [['#/sources', 'Lecture files', () => DB.sources.length], ['#/saved', 'Saved and progress'], ['#/settings', 'Settings']]],
@@ -94,6 +94,20 @@
     document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
   }
 
+  /* ---------------- Basu PDF page links (work only when the PDFs sit in basu/ on a local copy) ---------------- */
+  document.addEventListener('click', async e => {
+    const a = e.target.closest('a.bpdf'); if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault();
+    const href = a.getAttribute('href'), file = href.split('#')[0];
+    const w = window.open('', '_blank');
+    let ok = false;
+    try { ok = (await fetch(file, { method: 'HEAD', cache: 'no-store' })).ok; } catch (err) { ok = false; }
+    if (ok && w) { w.location.href = href; return; }
+    if (ok) { location.href = href; return; }
+    if (w) w.close();
+    toast(`Open your Basu Vol ${a.dataset.v} PDF at page ${a.dataset.p} (the PDFs are not on this site)`);
+  });
+
   /* ---------------- router ---------------- */
   const view = () => $('#view');
   let cleanup = [];
@@ -109,7 +123,7 @@
     let active = '#/' + r;
     try {
       if (!r) homeView();
-      else if (r === 'read') { readerView(p[1], p[2], p[3], q); active = p[1] === 'exam' ? '#/read/exam/L1' : p[1] === 'ddbu' ? '#/read/ddbu/B0' : '#/read/day/D1'; }
+      else if (r === 'read') { readerView(p[1], p[2], p[3], q); active = p[1] === 'exam' ? '#/read/exam/L1' : p[1] === 'ddbu' ? '#/read/ddbu/B0' : p[1] === 'guide' ? '#/read/guide/G0' : '#/read/day/D1'; }
       else if (r === 'cases') casesView(q);
       else if (r === 'case') { caseView(p[1]); active = '#/cases'; }
       else if (r === 'articles' || r === 'article') { articlesView(p[1] || '14'); active = '#/articles'; }
@@ -193,8 +207,8 @@
   }
   function sylItem(ch) {
     const p = progressOf(ch);
-    const sub = ch.doc === 'exam' ? (ch.tag ? `Source: ${esc(ch.tag)}` : '') : ch.doc === 'ddbu' ? '' : esc(ch.date || '');
-    const no = ch.doc === 'ddbu' ? (ch.num || 'i') : ch.doc === 'exam' ? (ch.num || '—') : (ch.id === 'D0' ? 'Ref' : ch.id === 'WS' ? 'W' : ch.num);
+    const sub = ch.doc === 'exam' ? (ch.tag ? `Source: ${esc(ch.tag)}` : '') : ch.doc === 'ddbu' ? '' : ch.doc === 'guide' ? (ch.pages ? `Vol ${ch.vol}, PDF pp. ${ch.pages[0]}–${ch.pages[1]}` : '') : esc(ch.date || '');
+    const no = ch.doc === 'ddbu' || ch.doc === 'guide' ? (ch.num || 'i') : ch.doc === 'exam' ? (ch.num || '—') : (ch.id === 'D0' ? 'Ref' : ch.id === 'WS' ? 'W' : ch.num);
     return `<li><a href="#/read/${ch.doc}/${ch.id}"><span class="no">${esc(no)}</span><span class="nm">${esc(ch.title)}${sub ? `<small>${sub}</small>` : ''}</span>
       <span class="prog ${p.d === p.n && p.n ? 'done' : ''}">${p.d ? `${p.d}/${p.n} revised` : `${p.n} parts`}</span></a></li>`;
   }
@@ -205,7 +219,7 @@
     const revised = Object.keys(S.rev).length;
     view().innerHTML = `<div class="wrap">
       <h1 class="page">Constitutional Law</h1>
-      <p class="lede">Every lecture from 15 July to 19 October 2026 in one place: ${DB.exam.filter(c => c.kind === 'lecture').length} exam-ready lectures, ${day.length - 2} day-wise sessions, ${DB.ddbu.length - 1} D.D.B.U chapters on Basu's Article 13, ${DB.cases.length} cases with judgment links, and ${DB.articles.length} Articles of the Constitution. ${revised ? `You have marked ${revised} of ${M.secs.length} parts as revised.` : ''}</p>
+      <p class="lede">Every lecture from 15 July to 19 October 2026 in one place: ${DB.exam.filter(c => c.kind === 'lecture').length} exam-ready lectures, ${day.length - 2} day-wise sessions, ${DB.ddbu.length - 1} D.D.B.U chapters on Basu's Article 13, a ${DB.guide.length - 1}-chapter guide to the whole of Basu Vols 1–6, ${DB.cases.length} cases with judgment links, and ${DB.articles.length} Articles of the Constitution. ${revised ? `You have marked ${revised} of ${M.secs.length} parts as revised.` : ''}</p>
       <form class="home-search" id="hs" role="search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <label class="sr" for="hq">Search the notes</label><input id="hq" type="search" placeholder="Search notes, cases, Articles and lecture PDFs — e.g. eclipse, Romesh Thappar, 19(2)"></form>
       ${last ? `<a class="continue" href="${secHref(last.key)}"><span><span class="muted">Continue reading</span><br><b>${esc(last.title)}</b> <span class="muted">— ${esc(chapterLabel(M.ch[last.doc + '/' + last.ch]))}</span></span></a>` : ''}
@@ -213,6 +227,7 @@
         <section><h2 class="block">Exam-ready notes, October</h2><p class="muted" style="margin-top:-6px">Art 19, property, FR v DPSP and Art 21 — with case cards, class questions and solved homework.</p><ol class="syl">${exam.map(sylItem).join('')}</ol></section>
         <section><h2 class="block">Day-wise class notes, July to October</h2><p class="muted" style="margin-top:-6px">Rule of law, basic structure, Arts 13–16 and Art 19(1)(a), session by session.</p><ol class="syl">${day.map(sylItem).join('')}</ol></section>
         <section style="grid-column:1/-1"><h2 class="block">D.D.B.U — Basu on Article 13</h2><p class="muted" style="margin-top:-6px">Own-words notes on D.D. Basu's Commentary: Art 13, judicial review and its limits, prospective overruling and validation.</p><ol class="syl">${DB.ddbu.map(sylItem).join('')}</ol></section>
+        <section style="grid-column:1/-1"><h2 class="block">Basu article guide — Introduction to Art 35A</h2><p class="muted" style="margin-top:-6px">Own-words summaries of each Article's commentary, with the volume and PDF page where each topic begins, and the leading cases.</p><ol class="syl">${DB.guide.map(sylItem).join('')}</ol></section>
       </div>
       <h2 class="block">Study tools</h2>
       <div class="tools">
@@ -235,7 +250,7 @@
     if (!ch) return notFound();
     const list = DB[doc];
     const prev = list[ch.idx - 1], next = list[ch.idx + 1];
-    const kicker = ch.doc === 'ddbu' ? (ch.kind === 'front' ? 'D.D.B.U notes' : `D.D.B.U notes, chapter ${ch.num} — Basu on Article 13`) : ch.doc === 'exam'
+    const kicker = ch.doc === 'guide' ? (ch.kind === 'front' ? 'Basu article guide' : `Basu article guide — ${chapterLabel(ch)}, Vol ${ch.vol}`) : ch.doc === 'ddbu' ? (ch.kind === 'front' ? 'D.D.B.U notes' : `D.D.B.U notes, chapter ${ch.num} — Basu on Article 13`) : ch.doc === 'exam'
       ? (ch.num ? `Exam-ready notes, lecture ${ch.num}${ch.tag ? ` (${esc(ch.tag)})` : ''}` : 'Exam-ready notes')
       : (ch.id === 'D0' ? 'Day-wise notes, reference' : ch.id === 'WS' ? 'Day-wise notes, handout' : ch.id === 'Dintro' ? 'Day-wise notes' : `Day ${ch.num}, ${esc(ch.date)}`);
     const hasQA = ch.sections.some(s => s.html.includes('class="qa-a"'));
