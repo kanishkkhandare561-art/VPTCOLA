@@ -30,10 +30,12 @@
   }
 
   /* ---------------- data indexes ---------------- */
+  const DOCS = ['exam', 'day', 'ddbu'];
+  const DOC_NAME = { exam: 'Exam-ready notes', day: 'Day-wise notes', ddbu: 'D.D.B.U notes' };
   const M = { ch: {}, sec: {}, secs: [], cases: {}, qa: {}, art: {}, fix: {}, src: {}, fixWhere: {}, topics: [] };
   function indexDB() {
-    for (const doc of ['exam', 'day']) {
-      DB[doc].forEach((ch, i) => {
+    for (const doc of DOCS) {
+      (DB[doc] || []).forEach((ch, i) => {
         ch.doc = doc; ch.idx = i;
         M.ch[doc + '/' + ch.id] = ch;
         ch.sections.forEach(s => {
@@ -53,12 +55,12 @@
     const t = new Set(); DB.cases.forEach(c => c.topics.forEach(x => t.add(x)));
     M.topics = [...t].sort();
   }
-  const chapterLabel = ch => ch.doc === 'exam'
+  const chapterLabel = ch => ch.doc === 'ddbu' ? (ch.kind === 'front' ? 'Start here' : `Chapter ${ch.num}`) : ch.doc === 'exam'
     ? (ch.num ? `Lecture ${ch.num}` : (ch.kind === 'toolkit' ? 'Revision' : 'Start here'))
     : (ch.id === 'D0' ? 'Reference' : ch.id === 'WS' ? 'Handout' : ch.id === 'Dintro' ? 'Start here' : `Day ${ch.num}`);
   const secHref = (key, extra = '') => `#/read/${key}${extra}`;
   const caseUrl = c => c.url || `${IK}/search/?formInput=${encodeURIComponent(`title: "${c.name.split(' v. ')[0]}"`)}`;
-  const caseSrcName = c => c.src === 'justia' ? 'Justia' : 'Indian Kanoon';
+  const caseSrcName = c => c.src === 'justia' ? 'Justia' : c.src === 'hca' ? 'High Court of Australia (decision below)' : 'Indian Kanoon';
 
   /* ---------------- user state ---------------- */
   const S = {
@@ -69,7 +71,7 @@
 
   /* ---------------- shell ---------------- */
   const NAV = [
-    ['Read', [['#/', 'Home'], ['#/read/exam/L1', 'Exam-ready notes', () => 'Oct'], ['#/read/day/D1', 'Day-wise class notes', () => 'Jul–Oct'], ['#/fixes', 'Corrections', () => DB.corrections.length]]],
+    ['Read', [['#/', 'Home'], ['#/read/exam/L1', 'Exam-ready notes', () => 'Oct'], ['#/read/day/D1', 'Day-wise class notes', () => 'Jul–Oct'], ['#/read/ddbu/B0', 'D.D.B.U — Basu on Art 13', () => DB.ddbu.length - 1], ['#/fixes', 'Corrections', () => DB.corrections.length]]],
     ['Find', [['#/search', 'Search everything'], ['#/cases', 'Case finder', () => DB.cases.length], ['#/articles', 'Constitution text', () => DB.articles.length], ['#/kanoon', 'Indian Kanoon search']]],
     ['Practise', [['#/solve', 'Problem frameworks'], ['#/flash', 'Flashcards'], ['#/quiz', 'Case quiz'], ['#/timeline', 'Timeline']]],
     ['Yours', [['#/sources', 'Lecture files', () => DB.sources.length], ['#/saved', 'Saved and progress'], ['#/settings', 'Settings']]],
@@ -107,7 +109,7 @@
     let active = '#/' + r;
     try {
       if (!r) homeView();
-      else if (r === 'read') { readerView(p[1], p[2], p[3], q); active = p[1] === 'exam' ? '#/read/exam/L1' : '#/read/day/D1'; }
+      else if (r === 'read') { readerView(p[1], p[2], p[3], q); active = p[1] === 'exam' ? '#/read/exam/L1' : p[1] === 'ddbu' ? '#/read/ddbu/B0' : '#/read/day/D1'; }
       else if (r === 'cases') casesView(q);
       else if (r === 'case') { caseView(p[1]); active = '#/cases'; }
       else if (r === 'articles' || r === 'article') { articlesView(p[1] || '14'); active = '#/articles'; }
@@ -159,7 +161,7 @@
 
   function casePop(c) {
     const fixes = DB.corrections.filter(x => x.src.some(u => u === c.url));
-    return `<h3>${esc(c.name)}</h3><p class="muted">${esc(c.date)}${c.court === 'HC' ? ', High Court' : c.court === 'US' ? ', US Supreme Court' : ', Supreme Court'}</p>
+    return `<h3>${esc(c.name)}</h3><p class="muted">${esc(c.date)}${c.court === 'HC' ? ', High Court' : c.court === 'US' ? ', US Supreme Court' : c.court === 'PC' ? ', Privy Council' : ', Supreme Court'}</p>
       <p>${esc(c.holding)}</p>${fixes.length ? `<p><b style="color:var(--madder)">Correction:</b> ${fixes.map(f => esc(f.title)).join('; ')}</p>` : ''}
       <div class="row"><a class="btn small" href="${esc(caseUrl(c))}" target="_blank" rel="noopener noreferrer">Open on ${caseSrcName(c)}</a><a class="btn small ghost" href="#/case/${c.k}">Case page</a></div>`;
   }
@@ -191,8 +193,8 @@
   }
   function sylItem(ch) {
     const p = progressOf(ch);
-    const sub = ch.doc === 'exam' ? (ch.tag ? `Source: ${esc(ch.tag)}` : '') : esc(ch.date || '');
-    const no = ch.doc === 'exam' ? (ch.num || '—') : (ch.id === 'D0' ? 'Ref' : ch.id === 'WS' ? 'W' : ch.num);
+    const sub = ch.doc === 'exam' ? (ch.tag ? `Source: ${esc(ch.tag)}` : '') : ch.doc === 'ddbu' ? '' : esc(ch.date || '');
+    const no = ch.doc === 'ddbu' ? (ch.num || 'i') : ch.doc === 'exam' ? (ch.num || '—') : (ch.id === 'D0' ? 'Ref' : ch.id === 'WS' ? 'W' : ch.num);
     return `<li><a href="#/read/${ch.doc}/${ch.id}"><span class="no">${esc(no)}</span><span class="nm">${esc(ch.title)}${sub ? `<small>${sub}</small>` : ''}</span>
       <span class="prog ${p.d === p.n && p.n ? 'done' : ''}">${p.d ? `${p.d}/${p.n} revised` : `${p.n} parts`}</span></a></li>`;
   }
@@ -203,13 +205,14 @@
     const revised = Object.keys(S.rev).length;
     view().innerHTML = `<div class="wrap">
       <h1 class="page">Constitutional Law</h1>
-      <p class="lede">Every lecture from 15 July to 19 October 2026 in one place: ${DB.exam.filter(c => c.kind === 'lecture').length} exam-ready lectures, ${day.length - 2} day-wise sessions, ${DB.cases.length} cases with judgment links, and ${DB.articles.length} Articles of the Constitution. ${revised ? `You have marked ${revised} of ${M.secs.length} parts as revised.` : ''}</p>
+      <p class="lede">Every lecture from 15 July to 19 October 2026 in one place: ${DB.exam.filter(c => c.kind === 'lecture').length} exam-ready lectures, ${day.length - 2} day-wise sessions, ${DB.ddbu.length - 1} D.D.B.U chapters on Basu's Article 13, ${DB.cases.length} cases with judgment links, and ${DB.articles.length} Articles of the Constitution. ${revised ? `You have marked ${revised} of ${M.secs.length} parts as revised.` : ''}</p>
       <form class="home-search" id="hs" role="search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <label class="sr" for="hq">Search the notes</label><input id="hq" type="search" placeholder="Search notes, cases, Articles and lecture PDFs — e.g. eclipse, Romesh Thappar, 19(2)"></form>
       ${last ? `<a class="continue" href="${secHref(last.key)}"><span><span class="muted">Continue reading</span><br><b>${esc(last.title)}</b> <span class="muted">— ${esc(chapterLabel(M.ch[last.doc + '/' + last.ch]))}</span></span></a>` : ''}
       <div class="course">
         <section><h2 class="block">Exam-ready notes, October</h2><p class="muted" style="margin-top:-6px">Art 19, property, FR v DPSP and Art 21 — with case cards, class questions and solved homework.</p><ol class="syl">${exam.map(sylItem).join('')}</ol></section>
         <section><h2 class="block">Day-wise class notes, July to October</h2><p class="muted" style="margin-top:-6px">Rule of law, basic structure, Arts 13–16 and Art 19(1)(a), session by session.</p><ol class="syl">${day.map(sylItem).join('')}</ol></section>
+        <section style="grid-column:1/-1"><h2 class="block">D.D.B.U — Basu on Article 13</h2><p class="muted" style="margin-top:-6px">Own-words notes on D.D. Basu's Commentary: Art 13, judicial review and its limits, prospective overruling and validation.</p><ol class="syl">${DB.ddbu.map(sylItem).join('')}</ol></section>
       </div>
       <h2 class="block">Study tools</h2>
       <div class="tools">
@@ -232,7 +235,7 @@
     if (!ch) return notFound();
     const list = DB[doc];
     const prev = list[ch.idx - 1], next = list[ch.idx + 1];
-    const kicker = ch.doc === 'exam'
+    const kicker = ch.doc === 'ddbu' ? (ch.kind === 'front' ? 'D.D.B.U notes' : `D.D.B.U notes, chapter ${ch.num} — Basu on Article 13`) : ch.doc === 'exam'
       ? (ch.num ? `Exam-ready notes, lecture ${ch.num}${ch.tag ? ` (${esc(ch.tag)})` : ''}` : 'Exam-ready notes')
       : (ch.id === 'D0' ? 'Day-wise notes, reference' : ch.id === 'WS' ? 'Day-wise notes, handout' : ch.id === 'Dintro' ? 'Day-wise notes' : `Day ${ch.num}, ${esc(ch.date)}`);
     const hasQA = ch.sections.some(s => s.html.includes('class="qa-a"'));
@@ -357,7 +360,7 @@
   }
   function docWhere(id) {
     const [t, ...r] = id.split(':'); const k = r.join(':');
-    if (t === 'n') { const s = M.sec[k]; const ch = M.ch[s.doc + '/' + s.ch]; return `${s.doc === 'exam' ? 'Exam-ready notes' : 'Day-wise notes'} — ${chapterLabel(ch)}: ${ch.title}`; }
+    if (t === 'n') { const s = M.sec[k]; const ch = M.ch[s.doc + '/' + s.ch]; return `${DOC_NAME[s.doc]} — ${chapterLabel(ch)}: ${ch.title}`; }
     if (t === 'c') { const c = M.cases[k]; return `Case, ${c.date}`; }
     if (t === 'q') { const x = M.qa[k]; const ch = M.ch[x.src + '/' + x.ch]; return `${x.kind === 'homework' ? 'Homework' : 'Question asked in class'} — ${ch ? chapterLabel(ch) + ': ' + ch.title : ''}`; }
     if (t === 'a') return 'Constitution of India';
@@ -406,7 +409,7 @@
     view().innerHTML = `<div class="wrap"><h1 class="page">Case finder</h1>
       <p class="lede">Every case in the notes, with the decision date checked on Indian Kanoon and a link to the full judgment. Green links inside the notes open these cards.</p>
       <div class="toolbar"><label class="sr" for="cf">Filter cases</label><input class="input" id="cf" type="search" placeholder="Filter by name or holding" value="${esc(caseState.text)}">
-        <select class="select" id="cc" aria-label="Court"><option value="">All courts</option><option value="SC">Supreme Court of India</option><option value="HC">High Courts</option><option value="US">US Supreme Court</option></select>
+        <select class="select" id="cc" aria-label="Court"><option value="">All courts</option><option value="SC">Supreme Court of India</option><option value="HC">High Courts</option><option value="US">US Supreme Court</option><option value="PC">Privy Council</option></select>
         <select class="select" id="cs" aria-label="Sort"><option value="year">Oldest first</option><option value="-year">Newest first</option><option value="name">A to Z</option><option value="seen">Most mentioned</option></select></div>
       <div class="chips" id="ct" style="margin-bottom:14px"><button class="chip" data-t="" aria-pressed="${!caseState.topic}">All topics</button>${M.topics.map(t => `<button class="chip" data-t="${esc(t)}" aria-pressed="${caseState.topic === t}">${esc(t)}</button>`).join('')}</div>
       <p class="count-line" id="cn"></p><ul class="cases" id="cl"></ul></div>`;
@@ -439,11 +442,11 @@
     const short = c.name.replace(/\s*\(.*?\)\s*$/, '').split(/ v\. /)[0].replace(/^(State of|Union of India|The)\s+/, '');
     const ikCite = `${IK}/search/?formInput=${encodeURIComponent(`"${c.name.replace(/\s*\(.*?\)\s*$/, '')}"`)}`;
     view().innerHTML = `<div class="wrap case-page"><p class="muted"><a href="#/cases">Case finder</a></p><h1 class="page">${esc(c.name)}</h1>
-      <dl class="facts"><dt>Decided</dt><dd>${esc(c.date)}</dd><dt>Court</dt><dd>${c.court === 'HC' ? 'High Court' : c.court === 'US' ? 'Supreme Court of the United States' : 'Supreme Court of India'}</dd>
+      <dl class="facts"><dt>Decided</dt><dd>${esc(c.date)}</dd><dt>Court</dt><dd>${c.court === 'HC' ? 'High Court' : c.court === 'US' ? 'Supreme Court of the United States' : c.court === 'PC' ? 'Privy Council' : 'Supreme Court of India'}</dd>
       <dt>Topics</dt><dd>${c.topics.map(t => `<a class="pill chakra" href="#/cases?t=${encodeURIComponent(t)}" style="text-decoration:none">${esc(t)}</a>`).join(' ')}</dd></dl>
       <p class="holding">${esc(c.holding)}</p>
       <div class="row" style="margin-bottom:24px"><a class="btn" href="${esc(caseUrl(c))}">Read the judgment on ${caseSrcName(c)}</a>
-      ${c.court !== 'US' ? `<a class="btn ghost" href="${esc(ikCite)}">Judgments that cite it</a>` : ''}</div>
+      ${c.court !== 'US' && c.court !== 'PC' ? `<a class="btn ghost" href="${esc(ikCite)}">Judgments that cite it</a>` : ''}</div>
       ${fixes.map(f => `<div class="fixnote"><b>Correction — ${esc(f.title)}.</b> ${esc(f.right)}</div>`).join('')}
       ${cards.length ? `<h2 class="block">From your notes</h2>${cards.map(cardHTML).join('')}` : ''}
       <h2 class="block">Where it comes up</h2>${seen.length ? `<ul class="linklist">${seen.map(s => `<li><a href="${secHref(s.key, '?q=' + encodeURIComponent(short))}">${esc(s.title)}</a> <span class="muted">— ${esc(chapterLabel(M.ch[s.doc + '/' + s.ch]))}, ${esc(M.ch[s.doc + '/' + s.ch].title)}</span></li>`).join('')}</ul>` : '<p class="muted">Only in the case list.</p>'}
@@ -603,7 +606,7 @@
 
   /* ---------------- quiz ---------------- */
   function quizView() {
-    const pool = DB.cases.filter(c => c.court !== 'US');
+    const pool = DB.cases.filter(c => c.court !== 'US' && c.court !== 'PC');
     const qs = shuffle(pool).slice(0, 10).map(c => {
       const same = pool.filter(x => x.k !== c.k && x.topics.some(t => c.topics.includes(t)));
       const others = shuffle(same.length >= 3 ? same : pool.filter(x => x.k !== c.k)).slice(0, 3);
@@ -714,11 +717,11 @@
   function savedView() {
     const bms = S.bm.map(k => M.sec[k]).filter(Boolean);
     const notes = Object.keys(S.notes).map(k => M.sec[k] && [M.sec[k], S.notes[k]]).filter(Boolean);
-    const prog = ['exam', 'day'].map(doc => DB[doc].filter(c => c.sections.length).map(ch => ({ ch, ...progressOf(ch) })));
+    const prog = DOCS.map(doc => DB[doc].filter(c => c.sections.length).map(ch => ({ ch, ...progressOf(ch) })));
     view().innerHTML = `<div class="wrap"><h1 class="page">Saved and progress</h1><p class="lede">Everything here is stored only in this browser. Export a backup before clearing your browser data or switching devices.</p>
       <h2 class="block">Saved parts (${bms.length})</h2>${bms.length ? `<ul class="linklist">${bms.map(s => `<li><a href="${secHref(s.key)}">${esc(s.title)}</a> <span class="muted">— ${esc(chapterLabel(M.ch[s.doc + '/' + s.ch]))}, ${esc(M.ch[s.doc + '/' + s.ch].title)}</span></li>`).join('')}</ul>` : '<p class="muted">Use "Save" in the margin of any part of the notes.</p>'}
       <h2 class="block">My notes (${notes.length})</h2>${notes.length ? `<ul class="linklist">${notes.map(([s, t]) => `<li><a href="${secHref(s.key)}">${esc(s.title)}</a><br><span class="muted">${esc(t.slice(0, 200))}</span></li>`).join('')}</ul>` : '<p class="muted">Use "My note" in the margin to write your own points beside the notes.</p>'}
-      <h2 class="block">Revision progress</h2><div class="course">${prog.map((list, i) => `<section><h3 style="margin:0 0 8px">${i ? 'Day-wise notes' : 'Exam-ready notes'}</h3><ol class="syl">${list.map(({ ch, n, d }) => `<li><a href="#/read/${ch.doc}/${ch.id}"><span class="no">${esc(chapterLabel(ch).replace(/^(Lecture|Day) /, ''))}</span><span class="nm">${esc(ch.title)}</span><span class="prog ${d === n ? 'done' : ''}">${d}/${n}</span></a></li>`).join('')}</ol></section>`).join('')}</div>
+      <h2 class="block">Revision progress</h2><div class="course">${prog.map((list, i) => `<section><h3 style="margin:0 0 8px">${DOC_NAME[DOCS[i]]}</h3><ol class="syl">${list.map(({ ch, n, d }) => `<li><a href="#/read/${ch.doc}/${ch.id}"><span class="no">${esc(chapterLabel(ch).replace(/^(Lecture|Day|Chapter) /, ''))}</span><span class="nm">${esc(ch.title)}</span><span class="prog ${d === n ? 'done' : ''}">${d}/${n}</span></a></li>`).join('')}</ol></section>`).join('')}</div>
       <h2 class="block">Backup</h2><div class="row"><button class="btn ghost" id="exp">Export my data</button><label class="btn ghost" style="cursor:pointer">Import a backup<input type="file" id="imp" accept="application/json" hidden></label><button class="btn ghost" id="rst">Reset progress</button></div></div>`;
     $('#exp').addEventListener('click', () => {
       const data = { v: 1, rev: S.rev, bm: S.bm, notes: S.notes, fc: S.fc, steps: S.steps };
